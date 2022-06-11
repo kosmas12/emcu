@@ -8,13 +8,14 @@
 
 #include <string>
 #include <vector>
+#include "Register.h"
 
 class Architecture {
 private:
     std::string name;
     void getDefaultRegisters();
 public:
-    std::vector<uint8_t> defaultRegisters;
+    std::vector<Register> defaultRegisters;
     Architecture(std::string name = "AVR8");
 };
 

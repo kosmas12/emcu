@@ -13,4 +13,4 @@ add_executable(emcu main.cpp board/mcu/MCU.cpp
         peripheral/Peripheral.h
         peripheral/Terminal.cpp
         peripheral/Terminal.h
-        arch/arches/AVR8.cpp)
+        arch/arches/AVR8.cpp arch/Register.h arch/Register.cpp)

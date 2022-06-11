@@ -6,13 +6,19 @@
 #define EMCU_AVR8_H
 
 #include "../../board/mcu/MCU.h"
+#include "../Register.h"
 
 #define STATUS_REGISTER 0
 #define PROGRAM_COUNTER 1
 #define STACK_POINTER 2
 
-std::vector<uint8_t> getDefaultAVR8Registers();
+#define MAIN_MEMORY 0
+#define PROGRAM_MEMORY 1
+#define EEPROM_MEMORY 2
+#define IO_MEMORY 3
 
-void AVRExecuteNext(MCU *mcu);
+std::vector<Register> getDefaultAVR8Registers();
+
+void AVR8ExecuteNext(MCU *mcu);
 
 #endif //EMCU_AVR8_H
