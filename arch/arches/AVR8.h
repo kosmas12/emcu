@@ -17,6 +17,15 @@
 #define EEPROM_MEMORY 2
 #define IO_MEMORY 3
 
+#define CARRY_FLAG 0
+#define ZERO_FLAG 1
+#define NEGATIVE_FLAG 2
+#define TWOS_COMPLEMENT_OVERFLOW_FLAG 3
+#define SIGN_FLAG 4
+#define HALF_CARRY_FLAG 5
+#define TRANSFER_BIT 6
+#define GLOBAL_INTERRUPT_ENABLE_BIT 7
+
 std::vector<Register> getDefaultAVR8Registers();
 
 void AVR8ExecuteNext(MCU *mcu);

@@ -28,10 +28,10 @@ public:
     void writeRegister16bits(uint8_t registerNumber, uint16_t value);
 
     uint8_t readMemory8bits(uint8_t type, uint16_t location);
-    uint16_t readMemory16bits(uint8_t type, uint32_t location);
+    uint16_t readMemory16bits(uint8_t type, uint32_t location, bool bigEndian);
 
     void writeMemory8bits(uint8_t type, uint16_t location, uint8_t value);
-    void writeMemory16bits(uint8_t type, uint32_t location, uint16_t value);
+    void writeMemory16bits(uint8_t type, uint32_t location, uint16_t value, bool bigEndian);
 
     MCU();
     MCU(Architecture architecture);

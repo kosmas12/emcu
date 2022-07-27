@@ -6,6 +6,8 @@
 #include <utility>
 #include "MCU.h"
 #include "../../arch/arches/AVR8.h"
+#include <byteswap.h>
+#include <cstring>
 
 void dummyExecuteNext(MCU *mcu) {
     std::cout << "executeNext function not available on this MCU" << std::endl;
@@ -63,9 +65,9 @@ MCU::MCU(Architecture arch, std::vector<Register> registers, std::vector<std::ve
 
 void MCU::writeRegister8bits(uint8_t registerNumber, uint8_t value) {
     if (this->registers.size() >= registerNumber + 1) {
-        Register registerToWrite = this->registers[registerNumber];
-        if (registerToWrite.size >= 1) {
-            registerToWrite.bytes[0] = value;
+        Register *registerToWrite = &this->registers[registerNumber];
+        if (registerToWrite->size >= 1) {
+            registerToWrite->bytes[0] = value;
         }
     }
 }
@@ -85,7 +87,7 @@ uint16_t MCU::readRegister16bits(uint8_t registerNumber) {
     if (this->registers.size() >= registerNumber + 1) {
         if (this->registers[registerNumber].size >= 2) {
             word = this->registers[registerNumber].bytes[0];
-            word = (word << 8) | this->registers[registerNumber].bytes[0];
+            word = (word << 8) | this->registers[registerNumber].bytes[1];
             return word;
         }
     }
@@ -94,10 +96,10 @@ uint16_t MCU::readRegister16bits(uint8_t registerNumber) {
 
 void MCU::writeRegister16bits(uint8_t registerNumber, uint16_t value) {
     if (this->registers.size() >= registerNumber + 1) {
-        Register registerToWrite = this->registers[registerNumber];
-        if (registerToWrite.size >= 2) {
-            registerToWrite.bytes[0] = value >> 8;
-            registerToWrite.bytes[1] = value & 0xFF;
+        Register *registerToWrite = &this->registers[registerNumber];
+        if (registerToWrite->size >= 2) {
+            registerToWrite->bytes[0] = value >> 8;
+            registerToWrite->bytes[1] = value & 0xFF;
         }
     }
 }
@@ -115,18 +117,30 @@ void MCU::writeMemory8bits(uint8_t type, uint16_t location, uint8_t value) {
     }
 }
 
-uint16_t MCU::readMemory16bits(uint8_t type, uint32_t location) {
+uint16_t MCU::readMemory16bits(uint8_t type, uint32_t location, bool bigEndian) {
     if (this->memories.size() >= type + 1) {
-        return this->memories[type][location];
+        uint16_t word = this->memories[type][location++];
+        word = (word << 8) | this->memories[type][location];
+        if (bigEndian) {
+            return htobe16(word);
+        }
+        else {
+            return htole16(word);
+        }
     }
     return 0;
 }
 
-void MCU::writeMemory16bits(uint8_t type, uint32_t location, uint16_t value) {
+void MCU::writeMemory16bits(uint8_t type, uint32_t location, uint16_t value, bool bigEndian) {
     if (this->memories.size() >= type + 1) {
-        if (this->memories[type].size() >= location) {
-            this->memories[type][location++] = value >> 8;
-            this->memories[type][location] = value & 0xFF;
+        if (this->memories[type].size() >= location + 1) {
+            if (bigEndian) {
+                value = htobe16(value);
+            }
+            else {
+                value = htole16(value);
+            }
+            memcpy(&(this->memories[type][location]), &value, sizeof(value));
         }
     }
 }

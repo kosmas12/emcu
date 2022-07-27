@@ -15,4 +15,7 @@ void Architecture::getDefaultRegisters() {
 Architecture::Architecture(std::string name) {
     this->name = name;
     this->getDefaultRegisters();
+    if (name == "AVR8") {
+        this->bigEndian = false;
+    }
 }

@@ -16,6 +16,7 @@ private:
     void getDefaultRegisters();
 public:
     std::vector<Register> defaultRegisters;
+    bool bigEndian;
     Architecture(std::string name = "AVR8");
 };
 
