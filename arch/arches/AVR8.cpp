@@ -79,14 +79,13 @@ std::vector<Register> getDefaultAVR8Registers() {
     std::vector<Register> registers;
     // 32 general purpose registers seems to be a good default
     // Also PC, SP and Status
-    registers.emplace_back(Register(2));
-    registers.emplace_back(Register(2));
-
 
     Register empty8bitRegister = Register(1);
-    for (int i = 2; i < 35; ++i) {
+    for (int i = 0; i < 33; ++i) {
         registers.push_back(empty8bitRegister);
     }
+    registers.emplace_back(Register(2));
+    registers.emplace_back(Register(2));
 
     return registers;
 }
