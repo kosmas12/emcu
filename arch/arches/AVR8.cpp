@@ -92,11 +92,11 @@ std::vector<Register> getDefaultAVR8Registers() {
 
 void AVR8ExecuteNext(MCU *mcu) {
     uint16_t programCounter = mcu->readRegister16bits(PROGRAM_COUNTER);
-    uint16_t instruction = mcu->readMemory16bits(PROGRAM_MEMORY, programCounter, false);
+    uint16_t instruction = le16toh(mcu->readMemory16bits(PROGRAM_MEMORY, programCounter, false));
     mcu->writeRegister16bits(PROGRAM_COUNTER, programCounter + 1);
 
-    switch (instruction & 0xFC00) {
-        case 0x1C00:
+    switch (instruction & 0xFC) {
+        case 0x1C:
             addWithCarry(instruction, mcu);
             break;
         default:

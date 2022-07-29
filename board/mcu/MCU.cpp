@@ -122,10 +122,10 @@ uint16_t MCU::readMemory16bits(uint8_t type, uint32_t location, bool bigEndian) 
         uint16_t word = this->memories[type][location++];
         word = (word << 8) | this->memories[type][location];
         if (bigEndian) {
-            return htobe16(word);
+            return be16toh(word);
         }
         else {
-            return htole16(word);
+            return le16toh(word);
         }
     }
     return 0;
