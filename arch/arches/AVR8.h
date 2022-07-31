@@ -8,9 +8,9 @@
 #include "../../board/mcu/MCU.h"
 #include "../Register.h"
 
-#define STATUS_REGISTER 0
-#define PROGRAM_COUNTER 1
-#define STACK_POINTER 2
+#define STATUS_REGISTER 32
+#define PROGRAM_COUNTER 33
+#define STACK_POINTER 34
 
 #define MAIN_MEMORY 0
 #define PROGRAM_MEMORY 1

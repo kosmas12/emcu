@@ -104,14 +104,40 @@ void MCU::writeRegister16bits(uint8_t registerNumber, uint16_t value) {
     }
 }
 
-uint8_t MCU::readMemory8bits(uint8_t type, uint16_t location) {
+uint32_t MCU::readRegister32bits(uint8_t registerNumber) {
+    uint32_t dword;
+    if (this->registers.size() >= registerNumber + 1) {
+        if (this->registers[registerNumber].size >= 4) {
+            dword = this->registers[registerNumber].bytes[0];
+            dword |= this->registers[registerNumber].bytes[1] << 8;
+            dword |= this->registers[registerNumber].bytes[2] << 16;
+            dword |= this->registers[registerNumber].bytes[3] << 24;
+            return dword;
+        }
+    }
+    return 0;
+}
+
+void MCU::writeRegister32bits(uint8_t registerNumber, uint32_t value) {
+    if (this->registers.size() >= registerNumber + 1) {
+        Register *registerToWrite = &this->registers[registerNumber];
+        if (registerToWrite->size >= 4) {
+            registerToWrite->bytes[0] = value & 0xFF;
+            registerToWrite->bytes[1] = (value & 0xFF00) >> 8;
+            registerToWrite->bytes[2] = (value & 0xFF0000) >> 16;
+            registerToWrite->bytes[3] = (value & 0xFF000000) >> 24;
+        }
+    }
+}
+
+uint8_t MCU::readMemory8bits(uint8_t type, uint32_t location) {
     if (this->memories.size() >= type + 1) {
         return this->memories[type][location];
     }
     return 0;
 }
 
-void MCU::writeMemory8bits(uint8_t type, uint16_t location, uint8_t value) {
+void MCU::writeMemory8bits(uint8_t type, uint32_t location, uint8_t value) {
     if (this->memories.size() >= type + 1) {
         this->memories[type][location] = value;
     }

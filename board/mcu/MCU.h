@@ -27,10 +27,13 @@ public:
     void writeRegister8bits(uint8_t registerNumber, uint8_t value);
     void writeRegister16bits(uint8_t registerNumber, uint16_t value);
 
-    uint8_t readMemory8bits(uint8_t type, uint16_t location);
+    uint32_t readRegister32bits(uint8_t registerNumber);
+    void writeRegister32bits(uint8_t registerNumber, uint32_t value);
+
+    uint8_t readMemory8bits(uint8_t type, uint32_t location);
     uint16_t readMemory16bits(uint8_t type, uint32_t location, bool bigEndian);
 
-    void writeMemory8bits(uint8_t type, uint16_t location, uint8_t value);
+    void writeMemory8bits(uint8_t type, uint32_t location, uint8_t value);
     void writeMemory16bits(uint8_t type, uint32_t location, uint16_t value, bool bigEndian);
 
     MCU();
@@ -41,6 +44,7 @@ public:
         std::vector<Peripheral> peripherals);
     MCU(Architecture arch, std::vector<Register> registers, std::vector<std::vector<uint8_t>> memories,
         std::vector<Peripheral> peripherals, const std::function<void(MCU *)>& executeNext);
+
 };
 
 
