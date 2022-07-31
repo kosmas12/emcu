@@ -64,11 +64,13 @@ void loadIHEX(MCU *mcu, std::ifstream file) {
 int main(int argc, char **argv) {
     Architecture arch = Architecture("AVR8");
     std::vector<std::vector<uint8_t>> memories;
+    std::vector<uint8_t> mainMemory (8000);
     std::vector<uint8_t> programMemory (32000 * 16);
-    std::vector<uint8_t> dataMemory (8000);
+    std::vector<uint8_t> ioMemory(64);
 
-    memories.push_back(dataMemory);
+    memories.push_back(mainMemory);
     memories.push_back(programMemory);
+    memories.push_back(ioMemory);
     
     std::vector<Peripheral> peripherals;
     MCU someMCU = MCU(arch, arch.defaultRegisters, memories, peripherals, AVR8ExecuteNext);

@@ -14,8 +14,7 @@
 
 #define MAIN_MEMORY 0
 #define PROGRAM_MEMORY 1
-#define EEPROM_MEMORY 2
-#define IO_MEMORY 3
+#define IO_MEMORY 2
 
 #define CARRY_FLAG 0
 #define ZERO_FLAG 1

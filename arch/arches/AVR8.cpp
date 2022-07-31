@@ -106,6 +106,17 @@ void jump(uint16_t instruction, MCU *mcu) {
     mcu->writeRegister32bits(PROGRAM_COUNTER, addressToJumpTo);
 }
 
+void out(uint16_t instruction, MCU *mcu) {
+    uint8_t ioSpaceAddress = ((instruction & 0x600) >> 5) | instruction & 0xF;
+    uint8_t Rr = (instruction & 0x1F0) >> 4;
+
+    uint8_t RrContents = mcu->readRegister8bits(Rr);
+    mcu->writeMemory8bits(IO_MEMORY, ioSpaceAddress, RrContents);
+
+    uint32_t programCounter = mcu->readRegister32bits(PROGRAM_COUNTER);
+    mcu->writeRegister32bits(PROGRAM_COUNTER, programCounter + 1);
+}
+
 std::vector<Register> getDefaultAVR8Registers() {
     std::vector<Register> registers;
     // 32 general purpose registers seems to be a good default
@@ -136,6 +147,10 @@ void AVR8ExecuteNext(MCU *mcu) {
             break;
         case 0x9400:
             jump(instruction, mcu);
+            break;
+        case 0xB800:
+        case 0xBC00:
+            out(instruction, mcu);
             break;
         default:
             std::cerr << "Unimplemented AVR8 instruction " << std::hex << instruction << std::endl;
