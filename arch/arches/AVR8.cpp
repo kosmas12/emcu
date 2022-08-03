@@ -117,6 +117,16 @@ void out(uint16_t instruction, MCU *mcu) {
     mcu->writeRegister32bits(PROGRAM_COUNTER, programCounter + 1);
 }
 
+void ldi(uint16_t instruction, MCU *mcu) {
+    uint8_t Rd = (instruction & 0xF0) >> 4;
+    uint8_t immediate = ((instruction & 0xF00) >> 4) | instruction & 0xF;
+
+    mcu->writeRegister8bits(Rd, immediate);
+
+    uint32_t programCounter = mcu->readRegister32bits(PROGRAM_COUNTER);
+    mcu->writeRegister32bits(PROGRAM_COUNTER, programCounter + 1);
+}
+
 std::vector<Register> getDefaultAVR8Registers() {
     std::vector<Register> registers;
     // 32 general purpose registers seems to be a good default
@@ -133,6 +143,7 @@ std::vector<Register> getDefaultAVR8Registers() {
 }
 
 void AVR8ExecuteNext(MCU *mcu) {
+    static uint32_t currentFrameClockCycles;
     uint32_t programCounter = mcu->readRegister32bits(PROGRAM_COUNTER);
     // The AVR Instruction Manual uses big endian notation for the opcodes, so this is easier
     uint16_t instruction = htobe16(mcu->readMemory16bits(PROGRAM_MEMORY, programCounter, false));
@@ -151,6 +162,12 @@ void AVR8ExecuteNext(MCU *mcu) {
         case 0xB800:
         case 0xBC00:
             out(instruction, mcu);
+            break;
+        case 0xE000:
+        case 0xE400:
+        case 0xE800:
+        case 0xEC00:
+            ldi(instruction, mcu);
             break;
         default:
             std::cerr << "Unimplemented AVR8 instruction " << std::hex << instruction << std::endl;
