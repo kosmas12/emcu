@@ -43,32 +43,32 @@ void addWithCarry(uint16_t instruction, MCU *mcu) {
     mcu->writeRegister8bits(Rd, result);
 
     uint8_t checkPassed;
-    uint8_t finalValue = 0;
+    uint8_t valueForStatus = 0;
 
     uint8_t dTemp = getBit(RdContents, 3);
     uint8_t rTemp = getBit(RrContents, 3);
     uint8_t RTemp = getBit(result, 3);
     checkPassed = dTemp && rTemp || rTemp && !RTemp || !RTemp && dTemp;
-    setBit(&finalValue, HALF_CARRY_FLAG, checkPassed);
+    setBit(&valueForStatus, HALF_CARRY_FLAG, checkPassed);
 
     dTemp = getBit(RdContents, 7);
     rTemp = getBit(RrContents, 7);
     RTemp = getBit(result, 7);
     checkPassed = dTemp && rTemp && !RTemp || !dTemp && rTemp && RTemp;
-    setBit(&finalValue, TWOS_COMPLEMENT_OVERFLOW_FLAG, checkPassed);
+    setBit(&valueForStatus, TWOS_COMPLEMENT_OVERFLOW_FLAG, checkPassed);
 
     checkPassed = RTemp;
-    setBit(&finalValue, NEGATIVE_FLAG, checkPassed);
+    setBit(&valueForStatus, NEGATIVE_FLAG, checkPassed);
 
-    checkPassed = getBit(finalValue, NEGATIVE_FLAG) ^ getBit(finalValue, TWOS_COMPLEMENT_OVERFLOW_FLAG);
-    setBit(&finalValue, SIGN_FLAG, checkPassed);
+    checkPassed = getBit(valueForStatus, NEGATIVE_FLAG) ^ getBit(valueForStatus, TWOS_COMPLEMENT_OVERFLOW_FLAG);
+    setBit(&valueForStatus, SIGN_FLAG, checkPassed);
 
-    setBit(&finalValue, ZERO_FLAG, result == 0);
+    setBit(&valueForStatus, ZERO_FLAG, result == 0);
 
     checkPassed = dTemp && rTemp || rTemp && !RTemp || !RTemp && dTemp;
-    setBit(&finalValue, CARRY_FLAG, checkPassed);
+    setBit(&valueForStatus, CARRY_FLAG, checkPassed);
 
-    mcu->writeRegister8bits(STATUS_REGISTER, finalValue);
+    mcu->writeRegister8bits(STATUS_REGISTER, valueForStatus);
 
     uint32_t programCounter = mcu->readRegister32bits(PROGRAM_COUNTER);
     mcu->writeRegister32bits(PROGRAM_COUNTER, programCounter + 1);
@@ -84,17 +84,53 @@ void exclusiveOR(uint16_t instruction, MCU *mcu) {
     uint8_t result = RdContents ^ RrContents;
     mcu->writeRegister8bits(Rd, result);
 
-    uint8_t finalValue = mcu->readRegister8bits(STATUS_REGISTER);
+    uint8_t valueForStatus = mcu->readRegister8bits(STATUS_REGISTER);
 
-    setBit(&finalValue, TWOS_COMPLEMENT_OVERFLOW_FLAG, false);
-    setBit(&finalValue, NEGATIVE_FLAG, getBit(result, 7));
-    setBit(&finalValue, ZERO_FLAG, result == 0);
-    setBit(&finalValue, SIGN_FLAG, (getBit(result, 7) ^ 0));
-    mcu->writeRegister8bits(STATUS_REGISTER, finalValue);
+    setBit(&valueForStatus, TWOS_COMPLEMENT_OVERFLOW_FLAG, false);
+    setBit(&valueForStatus, NEGATIVE_FLAG, getBit(result, 7));
+    setBit(&valueForStatus, ZERO_FLAG, result == 0);
+    setBit(&valueForStatus, SIGN_FLAG, (getBit(result, 7) ^ 0));
+    mcu->writeRegister8bits(STATUS_REGISTER, valueForStatus);
 
     uint32_t programCounter = mcu->readRegister32bits(PROGRAM_COUNTER);
     mcu->writeRegister32bits(PROGRAM_COUNTER, programCounter + 1);
 
+}
+
+void compareWithImmediate(uint16_t instruction, MCU *mcu) {
+    uint8_t immediate = ((instruction & 0xF00) >> 4) | (instruction & 0xF);
+    uint8_t Rd = (instruction & 0xF0) >> 4;
+    uint8_t RdContents = mcu->readRegister8bits(Rd);
+    uint8_t result = RdContents - immediate;
+
+    uint8_t iTemp = getBit(immediate, 3);
+    uint8_t dTemp = getBit(RdContents, 3);
+    uint8_t RTemp = getBit(result, 3);
+
+    uint8_t valueForStatus = mcu->readRegister8bits(STATUS_REGISTER);
+
+    uint8_t checkPassed = !dTemp && iTemp || iTemp && RTemp || RTemp && !dTemp;
+    setBit(&valueForStatus, HALF_CARRY_FLAG, checkPassed);
+
+    iTemp = getBit(immediate, 7);
+    dTemp = getBit(RdContents, 7);
+    RTemp = getBit(result, 7);
+
+    checkPassed = dTemp && !iTemp && !RTemp || dTemp && iTemp && RTemp;
+    setBit(&valueForStatus, TWOS_COMPLEMENT_OVERFLOW_FLAG, checkPassed);
+
+    setBit(&valueForStatus, NEGATIVE_FLAG, getBit(result, 7));
+    setBit(&valueForStatus, ZERO_FLAG, result == 0);
+
+    checkPassed = !dTemp && iTemp || iTemp && RTemp || RTemp && dTemp;
+    setBit(&valueForStatus, CARRY_FLAG, checkPassed);
+
+    checkPassed = getBit(valueForStatus, NEGATIVE_FLAG) ^ getBit(valueForStatus, TWOS_COMPLEMENT_OVERFLOW_FLAG);
+    setBit(&valueForStatus, SIGN_FLAG, checkPassed);
+
+
+    uint32_t programCounter = mcu->readRegister32bits(PROGRAM_COUNTER);
+    mcu->writeRegister32bits(PROGRAM_COUNTER, programCounter + 1);
 }
 
 void jump(uint16_t instruction, MCU *mcu) {
@@ -115,6 +151,13 @@ void out(uint16_t instruction, MCU *mcu) {
 
     uint32_t programCounter = mcu->readRegister32bits(PROGRAM_COUNTER);
     mcu->writeRegister32bits(PROGRAM_COUNTER, programCounter + 1);
+}
+
+void relativeJump(uint16_t instruction, MCU *mcu) {
+    uint16_t bytesToPass = instruction & 0xFFF;
+
+    uint32_t programCounter = mcu->readRegister32bits(PROGRAM_COUNTER);
+    mcu->writeRegister32bits(PROGRAM_COUNTER, programCounter + (int16_t)bytesToPass + 2);
 }
 
 void ldi(uint16_t instruction, MCU *mcu) {
@@ -156,12 +199,24 @@ void AVR8ExecuteNext(MCU *mcu) {
         case 0x2400:
             exclusiveOR(instruction, mcu);
             break;
+        case 0x3000:
+        case 0x3400:
+        case 0x3800:
+        case 0x3C00:
+            compareWithImmediate(instruction, mcu);
+            break;
         case 0x9400:
             jump(instruction, mcu);
             break;
         case 0xB800:
         case 0xBC00:
             out(instruction, mcu);
+            break;
+        case 0xC000:
+        case 0xC400:
+        case 0xC800:
+        case 0xCC00:
+            relativeJump(instruction, mcu);
             break;
         case 0xE000:
         case 0xE400:

@@ -105,7 +105,7 @@ int main(int argc, char **argv) {
             stream << input;
             stream >> std::hex >> opcode;
             stream.clear();
-            uint16_t programCounter = someMCU.readRegister16bits(PROGRAM_COUNTER);
+            uint32_t programCounter = someMCU.readRegister32bits(PROGRAM_COUNTER);
             someMCU.writeMemory16bits(PROGRAM_MEMORY, programCounter, opcode, someMCU.arch.bigEndian);
             someMCU.executeNext(&someMCU);
         }

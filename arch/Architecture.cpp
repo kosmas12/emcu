@@ -2,7 +2,6 @@
 // Created by kosmas on 12/5/2022.
 //
 
-#include <iostream>
 #include "Architecture.h"
 #include "arches/AVR8.h"
 
