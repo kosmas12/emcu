@@ -128,7 +128,45 @@ void compareWithImmediate(uint16_t instruction, MCU *mcu) {
     checkPassed = getBit(valueForStatus, NEGATIVE_FLAG) ^ getBit(valueForStatus, TWOS_COMPLEMENT_OVERFLOW_FLAG);
     setBit(&valueForStatus, SIGN_FLAG, checkPassed);
 
+    mcu->writeRegister8bits(STATUS_REGISTER, valueForStatus);
+    uint32_t programCounter = mcu->readRegister32bits(PROGRAM_COUNTER);
+    mcu->writeRegister32bits(PROGRAM_COUNTER, programCounter + 1);
+}
 
+void compareWithCarry(uint16_t instruction, MCU *mcu) {
+    uint8_t Rd = (instruction & 0x1F0) >> 4;
+    uint8_t Rr = ((instruction & 0x200) >> 5) | (instruction & 0xF);
+
+    uint8_t RdContents = mcu->readRegister8bits(Rd);
+    uint8_t RrContents = mcu->readRegister8bits(Rr);
+    uint8_t status = mcu->readRegister8bits(STATUS_REGISTER);
+    uint8_t carryFlag = status & 1;
+
+    uint8_t result = RdContents - RrContents - carryFlag;
+
+    uint8_t rTemp = getBit(RrContents, 3);
+    uint8_t dTemp = getBit(RdContents, 3);
+    uint8_t RTemp = getBit(result, 3);
+
+    uint8_t checkPassed = !dTemp && rTemp || rTemp && RTemp || RTemp && !dTemp;
+    setBit(&status, HALF_CARRY_FLAG, checkPassed);
+
+    rTemp = getBit(Rr, 7);
+    dTemp = getBit(Rd, 7);
+    RTemp = getBit(result, 7);
+    checkPassed = dTemp && !rTemp && !RTemp || !dTemp && rTemp && RTemp;
+    setBit(&status, TWOS_COMPLEMENT_OVERFLOW_FLAG, checkPassed);
+
+    setBit(&status, NEGATIVE_FLAG, getBit(result, 7));
+    setBit(&status, ZERO_FLAG, result == 0);
+
+    checkPassed = getBit(status, TWOS_COMPLEMENT_OVERFLOW_FLAG) ^ getBit(status, NEGATIVE_FLAG);
+    setBit(&status, SIGN_FLAG, checkPassed);
+
+    checkPassed = !dTemp && rTemp || rTemp && RTemp || RTemp && dTemp;
+    setBit(&status, CARRY_FLAG, checkPassed);
+
+    mcu->writeRegister8bits(STATUS_REGISTER, status);
     uint32_t programCounter = mcu->readRegister32bits(PROGRAM_COUNTER);
     mcu->writeRegister32bits(PROGRAM_COUNTER, programCounter + 1);
 }
@@ -143,7 +181,7 @@ void jump(uint16_t instruction, MCU *mcu) {
 }
 
 void out(uint16_t instruction, MCU *mcu) {
-    uint8_t ioSpaceAddress = ((instruction & 0x600) >> 5) | instruction & 0xF;
+    uint8_t ioSpaceAddress = ((instruction & 0x600) >> 5) | (instruction & 0xF);
     uint8_t Rr = (instruction & 0x1F0) >> 4;
 
     uint8_t RrContents = mcu->readRegister8bits(Rr);
@@ -162,7 +200,7 @@ void relativeJump(uint16_t instruction, MCU *mcu) {
 
 void ldi(uint16_t instruction, MCU *mcu) {
     uint8_t Rd = (instruction & 0xF0) >> 4;
-    uint8_t immediate = ((instruction & 0xF00) >> 4) | instruction & 0xF;
+    uint8_t immediate = ((instruction & 0xF00) >> 4) | (instruction & 0xF);
 
     mcu->writeRegister8bits(Rd, immediate);
 
@@ -193,6 +231,9 @@ void AVR8ExecuteNext(MCU *mcu) {
     mcu->writeRegister32bits(PROGRAM_COUNTER, programCounter + 1);
 
     switch (instruction & 0xFC00) {
+	case 0x400:
+	   compareWithCarry(instruction, mcu);
+	   break;
         case 0x1C00:
             addWithCarry(instruction, mcu);
             break;
