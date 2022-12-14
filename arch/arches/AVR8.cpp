@@ -174,8 +174,7 @@ void compareWithCarry(uint16_t instruction, MCU *mcu) {
 void jump(uint16_t instruction, MCU *mcu) {
     uint32_t programCounter = mcu->readRegister32bits(PROGRAM_COUNTER);
     uint16_t secondWord = htobe16(mcu->readMemory16bits(PROGRAM_MEMORY, ++programCounter, false));
-    uint32_t fullInstruction = instruction << 16 | secondWord;
-    uint32_t addressToJumpTo = (((fullInstruction & 0x1000000) >> 3) | ((fullInstruction & 0xF00000) >> 3) | ((fullInstruction & 0x10000) << 3) | (fullInstruction & 0xFFFF)) << 1;
+    uint32_t addressToJumpTo = (((instruction & 0x1F0) << 16) | (instruction & 0x1 << 19) | (secondWord << 3) >> 3) << 1;
 
     mcu->writeRegister32bits(PROGRAM_COUNTER, addressToJumpTo);
 }
@@ -192,10 +191,10 @@ void out(uint16_t instruction, MCU *mcu) {
 }
 
 void relativeJump(uint16_t instruction, MCU *mcu) {
-    uint16_t bytesToPass = instruction & 0xFFF;
+    int16_t offset = (int16_t) (instruction & 0xFFF);
 
     uint32_t programCounter = mcu->readRegister32bits(PROGRAM_COUNTER);
-    mcu->writeRegister32bits(PROGRAM_COUNTER, programCounter + (int16_t)bytesToPass + 2);
+    mcu->writeRegister32bits(PROGRAM_COUNTER, programCounter + ((int16_t)offset * 2) + 1);
 }
 
 void ldi(uint16_t instruction, MCU *mcu) {
@@ -206,6 +205,20 @@ void ldi(uint16_t instruction, MCU *mcu) {
 
     uint32_t programCounter = mcu->readRegister32bits(PROGRAM_COUNTER);
     mcu->writeRegister32bits(PROGRAM_COUNTER, programCounter + 1);
+}
+
+void branchIfNotEqual(uint16_t instruction, MCU *mcu) {
+    uint8_t status = mcu->readRegister8bits(STATUS_REGISTER);
+    uint8_t zeroFlag = getBit(status, ZERO_FLAG);
+
+    uint32_t programCounter = mcu->readRegister32bits(PROGRAM_COUNTER);
+    uint32_t newPC = programCounter + 1;
+
+    if (!zeroFlag) {
+        int8_t offset = (int8_t)(instruction >> 3) * 2;
+        newPC += offset;
+    }
+    mcu->writeRegister32bits(PROGRAM_COUNTER, newPC);
 }
 
 std::vector<Register> getDefaultAVR8Registers() {
@@ -247,6 +260,7 @@ void AVR8ExecuteNext(MCU *mcu) {
             compareWithImmediate(instruction, mcu);
             break;
         case 0x9400:
+            // FIXME: CALL misinterpreted as JMP
             jump(instruction, mcu);
             break;
         case 0xB800:
@@ -265,8 +279,11 @@ void AVR8ExecuteNext(MCU *mcu) {
         case 0xEC00:
             ldi(instruction, mcu);
             break;
+        case 0xF400:
+            branchIfNotEqual(instruction, mcu);
+            break;
         default:
-            std::cerr << "Unimplemented AVR8 instruction " << std::hex << instruction << std::endl;
+            std::cerr << "Unimplemented AVR8 instruction 0x" << std::hex << instruction << " at PC 0x" << std::hex << programCounter << std::endl;
             exit(2);
             break;
     }
