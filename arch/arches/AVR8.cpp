@@ -179,6 +179,38 @@ void jump(uint16_t instruction, MCU *mcu) {
     mcu->writeRegister32bits(PROGRAM_COUNTER, addressToJumpTo);
 }
 
+void call(uint16_t instruction, MCU *mcu) {
+    uint32_t programCounter = mcu->readRegister32bits(PROGRAM_COUNTER);
+    uint16_t secondWord = htobe16(mcu->readMemory16bits(PROGRAM_MEMORY, ++programCounter, false));
+    uint32_t callAddress = (((instruction & 0x1F0) << 16) | (instruction & 0x1 << 19) | (secondWord << 3) >> 3) << 1;
+
+    uint32_t stackPointer = mcu->readRegister16bits(STACK_POINTER);
+    // For devices with a 22-bit PC (instead of 16), more data is pushed to the stack
+    if (mcu->registers[PROGRAM_COUNTER].size > 2) {
+        uint32_t value = programCounter + 2;
+        mcu->writeMemory8bits(MAIN_MEMORY, stackPointer, value & 0xFF);
+        mcu->writeMemory8bits(MAIN_MEMORY, stackPointer - 1, (value & 0xFF00) >> 8);
+        mcu->writeMemory8bits(MAIN_MEMORY, stackPointer - 2, (value & 0x3F0000) >> 16);
+        mcu->writeRegister16bits(STACK_POINTER, stackPointer - 3);
+    }
+    else {
+        mcu->writeMemory16bits(MAIN_MEMORY, stackPointer, (uint16_t)(programCounter + 2), false);
+        mcu->writeRegister16bits(STACK_POINTER, stackPointer - 2);
+    }
+
+    mcu->writeRegister32bits(PROGRAM_COUNTER, callAddress);
+}
+
+void sei(uint16_t instruction, MCU *mcu) {
+    uint32_t programCounter = mcu->readRegister32bits(PROGRAM_COUNTER);
+
+    uint8_t status = mcu->readRegister8bits(STATUS_REGISTER);
+    setBit(&status, GLOBAL_INTERRUPT_ENABLE_BIT, true);
+    mcu->writeRegister8bits(STATUS_REGISTER, status);
+
+    mcu->writeRegister32bits(PROGRAM_COUNTER, programCounter + 1);
+}
+
 void out(uint16_t instruction, MCU *mcu) {
     uint8_t ioSpaceAddress = ((instruction & 0x600) >> 5) | (instruction & 0xF);
     uint8_t Rr = (instruction & 0x1F0) >> 4;
@@ -260,8 +292,15 @@ void AVR8ExecuteNext(MCU *mcu) {
             compareWithImmediate(instruction, mcu);
             break;
         case 0x9400:
-            // FIXME: CALL misinterpreted as JMP
-            jump(instruction, mcu);
+            if ((instruction & 0b1110) == 0b1000) {
+                sei(instruction, mcu);
+            }
+            else if ((instruction & 0b1110) == 0b1100) {
+                jump(instruction, mcu);
+            }
+            else if ((instruction & 0b1110) == 0b1110) {
+                call(instruction, mcu);
+            }
             break;
         case 0xB800:
         case 0xBC00:
