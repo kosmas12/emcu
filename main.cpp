@@ -96,6 +96,10 @@ int main(int argc, char **argv) {
             }
         }
     }
+    else {
+        std::cout << "Usage:\n `emcu interactive` for a REPL\nor\n `emcu [path to program]` to run a program" << std::endl;
+        return 0;
+    }
 
     if (interactive) {
         uint16_t opcode;
