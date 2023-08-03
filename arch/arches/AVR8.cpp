@@ -259,6 +259,7 @@ std::vector<Register> getDefaultAVR8Registers() {
     // Also PC, SP and Status
 
     Register empty8bitRegister = Register(1);
+    registers.reserve(33);
     for (int i = 0; i < 33; ++i) {
         registers.push_back(empty8bitRegister);
     }
@@ -276,9 +277,9 @@ void AVR8ExecuteNext(MCU *mcu) {
     mcu->writeRegister32bits(PROGRAM_COUNTER, programCounter + 1);
 
     switch (instruction & 0xFC00) {
-	case 0x400:
-	   compareWithCarry(instruction, mcu);
-	   break;
+	    case 0x400:
+	        compareWithCarry(instruction, mcu);
+	        break;
         case 0x1C00:
             addWithCarry(instruction, mcu);
             break;
