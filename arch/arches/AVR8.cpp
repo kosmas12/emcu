@@ -133,6 +133,52 @@ void compareWithImmediate(uint16_t instruction, MCU *mcu) {
     mcu->writeRegister32bits(PROGRAM_COUNTER, programCounter + 1);
 }
 
+void orImmediate(uint16_t instruction, MCU *mcu) {
+    uint8_t Rd = (instruction & 0xF0) >> 4;
+    uint8_t RdContents = mcu->readRegister8bits(Rd);
+    uint8_t immediate = ((instruction & 0xF00) >> 4) | (instruction & 0xF);
+
+    uint8_t result = RdContents | immediate;
+    mcu->writeRegister8bits(Rd, result);
+
+    uint8_t status = mcu->readRegister8bits(STATUS_REGISTER);
+    setBit(&status, TWOS_COMPLEMENT_OVERFLOW_FLAG, false);
+
+    uint8_t RTemp = getBit(result, 7);
+    setBit(&status, NEGATIVE_FLAG, RTemp);
+    setBit(&status, ZERO_FLAG, result == 0);
+    setBit(&status, SIGN_FLAG, RTemp ^ 0);
+    mcu->writeRegister8bits(STATUS_REGISTER, status);
+
+    uint32_t programCounter = mcu->readRegister32bits(PROGRAM_COUNTER);
+    mcu->writeRegister32bits(PROGRAM_COUNTER, programCounter + 1);
+}
+
+void lds(uint16_t instruction, MCU *mcu) {
+    uint8_t Rd = (instruction & 0x1F0) >> 4;
+
+    uint32_t programCounter = mcu->readRegister32bits(PROGRAM_COUNTER);
+    uint16_t dataSpaceAddress = htobe16(mcu->readMemory16bits(PROGRAM_MEMORY, ++programCounter, false));
+
+    uint8_t value = mcu->readMemory8bits(MAIN_MEMORY, dataSpaceAddress);
+    mcu->writeRegister8bits(Rd, value);
+
+    mcu->writeRegister32bits(PROGRAM_COUNTER, programCounter + 2);
+}
+
+void sts(uint16_t instruction, MCU *mcu) {
+    uint8_t Rd = (instruction & 0x1F0) >> 4;
+    uint8_t RdContents = mcu->readRegister8bits(Rd);
+
+    uint32_t programCounter = mcu->readRegister32bits(PROGRAM_COUNTER);
+    uint16_t dataSpaceAddress = htobe16(mcu->readMemory16bits(PROGRAM_MEMORY, ++programCounter, false));
+
+    uint8_t value = mcu->readMemory8bits(MAIN_MEMORY, dataSpaceAddress);
+    mcu->writeMemory8bits(MAIN_MEMORY, dataSpaceAddress, RdContents);
+
+    mcu->writeRegister32bits(PROGRAM_COUNTER, programCounter + 2);
+}
+
 void compareWithCarry(uint16_t instruction, MCU *mcu) {
     uint8_t Rd = (instruction & 0x1F0) >> 4;
     uint8_t Rr = ((instruction & 0x200) >> 5) | (instruction & 0xF);
@@ -201,6 +247,28 @@ void call(uint16_t instruction, MCU *mcu) {
     mcu->writeRegister32bits(PROGRAM_COUNTER, callAddress);
 }
 
+void sbiw(uint16_t instruction, MCU *mcu) {
+    uint8_t immediate = (instruction & 0xF) | ((instruction & 0xC00) >> 4);
+    uint8_t pairBeginnings[4] = {24, 26, 28, 30};
+    uint8_t pair = (instruction & 0x30) >> 4;
+
+    uint8_t firstRegister = pairBeginnings[pair];
+    uint8_t secondRegister = firstRegister + 1;
+
+    // AVR is little endian, so the lower register holds the lower byte
+    uint16_t value = mcu->readRegister8bits(firstRegister);
+    value = (value | (mcu->readRegister8bits(secondRegister) << 8));
+
+    uint16_t result = value - immediate;
+
+    mcu->writeRegister8bits(firstRegister, (result & 0xFF));
+    mcu->writeRegister8bits(secondRegister, result >> 8);
+
+    uint32_t programCounter = mcu->readRegister32bits(PROGRAM_COUNTER);
+    mcu->writeRegister32bits(PROGRAM_COUNTER, programCounter + 1);
+
+}
+
 void sei(uint16_t instruction, MCU *mcu) {
     uint32_t programCounter = mcu->readRegister32bits(PROGRAM_COUNTER);
 
@@ -208,6 +276,16 @@ void sei(uint16_t instruction, MCU *mcu) {
     setBit(&status, GLOBAL_INTERRUPT_ENABLE_BIT, true);
     mcu->writeRegister8bits(STATUS_REGISTER, status);
 
+    mcu->writeRegister32bits(PROGRAM_COUNTER, programCounter + 1);
+}
+
+void in(uint16_t instruction, MCU *mcu) {
+    uint8_t Rd = (instruction & 0x1F0) >> 4;
+    uint8_t ioSpaceAddress = ((instruction & 0x600) >> 5) | (instruction & 0xF);
+
+    mcu->writeRegister8bits(Rd, mcu->readMemory8bits(IO_MEMORY, ioSpaceAddress));
+
+    uint32_t programCounter = mcu->readRegister32bits(PROGRAM_COUNTER);
     mcu->writeRegister32bits(PROGRAM_COUNTER, programCounter + 1);
 }
 
@@ -247,7 +325,21 @@ void branchIfNotEqual(uint16_t instruction, MCU *mcu) {
     uint32_t newPC = programCounter + 1;
 
     if (!zeroFlag) {
-        int8_t offset = (int8_t)(instruction >> 3) * 2;
+        int8_t offset = (int8_t)((instruction >> 3) * 2);
+        newPC += offset;
+    }
+    mcu->writeRegister32bits(PROGRAM_COUNTER, newPC);
+}
+
+void branchIfEqual(uint16_t instruction, MCU *mcu) {
+    uint8_t status = mcu->readRegister8bits(STATUS_REGISTER);
+    uint8_t zeroFlag = getBit(status, ZERO_FLAG);
+
+    uint32_t programCounter = mcu->readRegister32bits(PROGRAM_COUNTER);
+    uint32_t newPC = programCounter + 1;
+
+    if (zeroFlag) {
+        int8_t offset = (int8_t)((instruction >> 3) * 2);
         newPC += offset;
     }
     mcu->writeRegister32bits(PROGRAM_COUNTER, newPC);
@@ -256,15 +348,15 @@ void branchIfNotEqual(uint16_t instruction, MCU *mcu) {
 std::vector<Register> getDefaultAVR8Registers() {
     std::vector<Register> registers;
     // 32 general purpose registers seems to be a good default
-    // Also PC, SP and Status
+    // Also Status (8 bits), PC (16 bits) anf SP (16 bits)
 
     Register empty8bitRegister = Register(1);
     registers.reserve(33);
     for (int i = 0; i < 33; ++i) {
         registers.push_back(empty8bitRegister);
     }
-    registers.emplace_back(Register(4));
-    registers.emplace_back(Register(2));
+    registers.emplace_back(2);
+    registers.emplace_back(2);
 
     return registers;
 }
@@ -292,16 +384,45 @@ void AVR8ExecuteNext(MCU *mcu) {
         case 0x3C00:
             compareWithImmediate(instruction, mcu);
             break;
+        case 0x6000:
+        case 0x6400:
+        case 0x6800:
+        case 0x6C00:
+            orImmediate(instruction, mcu);
+            break;
+        case 0x9000:
+            if(((instruction & 0x200) >> 8) == 0) {
+                lds(instruction, mcu);
+            }
+            else {
+                sts(instruction, mcu);
+            }
+            break;
         case 0x9400:
-            if ((instruction & 0b1110) == 0b1000) {
-                sei(instruction, mcu);
+            if (((instruction & 0x300) >> 8) != 0x3) {
+                if ((instruction & 0b1110) == 0b1000) {
+                    sei(instruction, mcu);
+                }
+                else if ((instruction & 0b1110) == 0b1100) {
+                    jump(instruction, mcu);
+                }
+                else if ((instruction & 0b1110) == 0b1110) {
+                    call(instruction, mcu);
+                }
             }
-            else if ((instruction & 0b1110) == 0b1100) {
-                jump(instruction, mcu);
+            else {
+                sbiw(instruction, mcu);
             }
-            else if ((instruction & 0b1110) == 0b1110) {
-                call(instruction, mcu);
-            }
+            break;
+        case 0xB000:
+        case 0xB100:
+        case 0xB200:
+        case 0xB300:
+        case 0xB400:
+        case 0xB500:
+        case 0xB600:
+        case 0xB700:
+            in(instruction, mcu);
             break;
         case 0xB800:
         case 0xBC00:
@@ -318,6 +439,11 @@ void AVR8ExecuteNext(MCU *mcu) {
         case 0xE800:
         case 0xEC00:
             ldi(instruction, mcu);
+            break;
+        case 0xF000:
+            if ((instruction & 0b001) == 1) {
+                branchIfEqual(instruction, mcu);
+            }
             break;
         case 0xF400:
             branchIfNotEqual(instruction, mcu);
